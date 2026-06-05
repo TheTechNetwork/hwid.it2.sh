@@ -1,0 +1,10 @@
+name = "hwid"
+main = "worker/index.js"
+compatibility_date = "2024-11-01"
+
+[observability]
+enabled = true
+
+[[routes]]
+pattern = "hwid.it2.sh"
+custom_domain = true
