@@ -3,12 +3,12 @@
 // Serves the Intune HWID App Registration script from the Scripts-Public repo,
 // injecting the MSP name taken from the URL path so it can be run in one line:
 //
-//   irm https://hwid.it2.sh/SalientMSP | iex
+//   irm https://hwid.it2.sh/TheTechNetwork | iex
 //
 // The first path segment becomes $MspName. With no path the raw script is
 // served unchanged (it then requires $MspName to be defined manually):
 //
-//   $MspName = "SalientMSP"; irm https://hwid.it2.sh | iex
+//   $MspName = "TheTechNetwork"; irm https://hwid.it2.sh | iex
 
 // Single source of truth: the canonical script in TheTechNetwork/Scripts-Public.
 const SCRIPT_URL =
