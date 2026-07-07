@@ -26,6 +26,41 @@ async function fetchScript() {
   return res.text();
 }
 
+// PowerShell 7 guard, prepended to the served script.
+//
+// The HWID script drives the Microsoft.Graph PowerShell SDK, which is unreliable
+// on Windows PowerShell 5.1 (assembly-load conflicts, Connect-MgGraph failures).
+// Since `irm` is a 5.1 alias, the one-liner lands in 5.1 by default — so detect
+// that and relaunch the SAME one-liner under pwsh 7, or tell the user how to get
+// it. `return` stops the 5.1 host before it reaches the SDK code that would fail.
+//
+// `segment` is the already-validated, URL-encoded path piece, so it can be dropped
+// straight back into the relaunch URL. It only ever comes from MSP_PATTERN, so
+// there is no script-injection surface.
+function versionGuard(segment) {
+  const relaunchAuto = segment
+    ? `    pwsh -NoProfile -ExecutionPolicy Bypass -Command 'irm hwid.it2.sh/${segment} | iex'\n    return`
+    : `    Write-Warning 'Re-run under PowerShell 7 with your MSP name, e.g.:  pwsh -NoProfile -Command "$MspName=''YourMSP''; irm hwid.it2.sh | iex"'`;
+  const manualCmd = segment
+    ? `pwsh -c "irm hwid.it2.sh/${segment} | iex"`
+    : `pwsh -c "$MspName='YourMSP'; irm hwid.it2.sh | iex"`;
+  return [
+    `if ($PSVersionTable.PSVersion.Major -lt 7) {`,
+    `  Write-Host ''`,
+    `  if (Get-Command pwsh -ErrorAction SilentlyContinue) {`,
+    `    Write-Host 'This tool needs PowerShell 7 — relaunching under pwsh...' -ForegroundColor Cyan`,
+    relaunchAuto,
+    `  } else {`,
+    `    Write-Warning 'This tool requires PowerShell 7+ (the Microsoft.Graph SDK is unreliable on Windows PowerShell 5.1).'`,
+    `    Write-Host 'Install it once:  winget install --id Microsoft.PowerShell -e' -ForegroundColor Yellow`,
+    `    Write-Host 'Then run:         ${manualCmd}' -ForegroundColor Yellow`,
+    `  }`,
+    `  return`,
+    `}`,
+    ``,
+  ].join("\n");
+}
+
 export default {
   async fetch(request) {
     const url = new URL(request.url);
@@ -66,6 +101,10 @@ export default {
       body = `$MspName = '${safe}'\n${script}`;
     }
 
+    // Prepend the PS7 guard so a 5.1 host relaunches under pwsh before it ever
+    // reaches the Microsoft.Graph SDK calls that fail on 5.1.
+    body = versionGuard(segment) + body;
+
     return new Response(body, {
       status: 200,
       headers: {
@@ -73,6 +112,7 @@ export default {
         "Cache-Control": "public, max-age=300",
         "X-Source": "hwid.it2.sh",
         "X-Msp-Name": mspName || "(none)",
+        "X-Requires": "PowerShell-7",
       },
     });
   },
